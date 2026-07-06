@@ -22,6 +22,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
+# Extracs and joins page contents from each document in one string
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
 '''Load the Webpage'''
 loader = WebBaseLoader("https://en.wikipedia.org/wiki/Python_(programming_language)")
 docs = loader.load()
