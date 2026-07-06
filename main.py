@@ -22,9 +22,19 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
-# Load the Webpage https://en.wikipedia.org/wiki/Python_(programming_language)
-
+'''Load the Webpage'''
 loader = WebBaseLoader("https://en.wikipedia.org/wiki/Python_(programming_language)")
 docs = loader.load()
 
-print(docs[0].page_content[:500])
+'''Split the Text'''
+# Break text into chunks of 1,000 characters, but allow adjacent chunks to share 200 characters of overlap so context isn't lost."
+text_split = RecursiveCharacterTextSplitter(chunk_size = 1000, chunk_overlap = 200)
+splits = text_split.split_documents(docs)
+
+'''Embed and Store Tokens'''
+# Convert text splits to math vectors and save them locally in a Chroma database
+vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings())
+
+# Expose the database as a "retriever" tool so your chain can search it later
+retriever = vectorstore.as_retriever()
+
