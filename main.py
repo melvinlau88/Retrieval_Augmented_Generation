@@ -32,9 +32,14 @@ text_split = RecursiveCharacterTextSplitter(chunk_size = 1000, chunk_overlap = 2
 splits = text_split.split_documents(docs)
 
 '''Embed and Store Tokens'''
-# Convert text splits to math vectors and save them locally in a Chroma database
+# Convert text splits to vectors and save them in a Chroma database
 vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings())
-
-# Expose the database as a "retriever" tool so your chain can search it later
 retriever = vectorstore.as_retriever()
+
+'''Retreive and Generate'''
+# Use prompt template
+prompt = hub.pull("rlm/rag-prompt")
+
+# Create LLM with No creativity, only facts
+llm = ChatOpenAI(model_name="The Chatter Guy", temperature=0)
 
