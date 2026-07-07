@@ -8,9 +8,6 @@ git push
 from dotenv import load_dotenv
 load_dotenv()
 
-import bs4
-
-from langchain_classic import hub
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 import os
@@ -20,7 +17,6 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_community.vectorstores import Chroma
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from langchain_huggingface import HuggingFaceEmbeddings
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
@@ -39,8 +35,6 @@ docs = loader.load()
 text_split = RecursiveCharacterTextSplitter(chunk_size = 1000, chunk_overlap = 200)
 splits = text_split.split_documents(docs)
 
-'''Embed and Store Tokens'''
-# Convert text splits to vectors and save them in a Chroma database
 '''Embed and Store Tokens'''
 vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings)
 retriever = vectorstore.as_retriever()
