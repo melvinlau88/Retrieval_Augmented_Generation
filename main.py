@@ -13,14 +13,16 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 import os
 os.environ['LANGCHAIN_TRACING_V2'] = 'true'
 os.environ['LANGCHAIN_ENDPOINT'] = 'https://api.smith.langchain.com'
+
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_community.vectorstores import Chroma
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
-
 from langchain_huggingface import HuggingFaceEmbeddings
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.load import dumps, loads
+
 
 # Extracs and joins page contents from each document in one string
 def format_docs(docs):
@@ -36,23 +38,36 @@ text_split = RecursiveCharacterTextSplitter(chunk_size = 1000, chunk_overlap = 2
 splits = text_split.split_documents(docs)
 
 '''Embed and Store Tokens'''
+
+# Loads an embedding model that converts text into vectors
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+# Embeds every document chunk and stores both the text and vectors in a Chroma vector database
 vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings)
+
+# A retriever that searches the vector database for the most relevant document chunks
 retriever = vectorstore.as_retriever()
 
 '''Retreive and Generate'''
-# Use prompt template
-from langchain_core.prompts import ChatPromptTemplate
 
-prompt = ChatPromptTemplate.from_template(
-    """You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.
-
-Question: {question}
-Context: {context}
-Answer:"""
-)
 
 # Create LLM with no creativity, only facts
 llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+
+template = """You are an AI language model assistant. Your task is to generate five 
+different versions of the given user question to retrieve relevant documents from a vector 
+database. By generating multiple perspectives on the user question, your goal is to help
+the user overcome some of the limitations of the distance-based similarity search. 
+Provide these alternative questions separated by newlines. Original question: {question}"""
+prompt = ChatPromptTemplate.from_template(template)
+
+generate_queries = (
+    prompt
+    | llm 
+    | StrOutputParser() 
+    | (lambda x: x.split("\n"))
+)
+
 
 # Uses Langchain Expression Language for input, process and and output a question
 rag_chain = (
@@ -69,3 +84,4 @@ ans = rag_chain.invoke("Who created python")
 print("")
 print(ans)
 print("")
+
