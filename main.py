@@ -1,7 +1,7 @@
 r'''
 cd C:\Users\melvi\Downloads\VS_Code\Python\Retrieval_Augmented_Generation
 git add .
-git commit -m "test"
+git commit -m "Changed embedding method so I don't have to pay OpenAI"
 git push
 '''
 
@@ -22,6 +22,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
+from langchain_huggingface import HuggingFaceEmbeddings
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+from langchain_groq import ChatGroq
+
 # Extracs and joins page contents from each document in one string
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
@@ -37,13 +41,33 @@ splits = text_split.split_documents(docs)
 
 '''Embed and Store Tokens'''
 # Convert text splits to vectors and save them in a Chroma database
-vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings())
-retriever = vectorstore.as_retriever()
+vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings)
+retriever = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
 '''Retreive and Generate'''
 # Use prompt template
-prompt = hub.pull("rlm/rag-prompt")
+from langchain_core.prompts import ChatPromptTemplate
 
-# Create LLM with No creativity, only facts
-llm = ChatOpenAI(model_name="The Chatter Guy", temperature=0)
+prompt = ChatPromptTemplate.from_template(
+    """You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.
 
+Question: {question}
+Context: {context}
+Answer:"""
+)
+
+# Create LLM with no creativity, only facts
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+
+# Uses Langchain Expression Language for input, process and and output a question
+rag_chain = (
+    {
+    "context": retriever | format_docs, 
+    "question": RunnablePassthrough()
+    }
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+rag_chain.invoke("Who created python")
