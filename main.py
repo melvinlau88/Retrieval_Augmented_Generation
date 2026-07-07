@@ -41,8 +41,9 @@ splits = text_split.split_documents(docs)
 
 '''Embed and Store Tokens'''
 # Convert text splits to vectors and save them in a Chroma database
+'''Embed and Store Tokens'''
 vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings)
-retriever = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+retriever = vectorstore.as_retriever()
 
 '''Retreive and Generate'''
 # Use prompt template
