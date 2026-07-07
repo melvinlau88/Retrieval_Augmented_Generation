@@ -71,4 +71,7 @@ rag_chain = (
     | StrOutputParser()
 )
 
-rag_chain.invoke("Who created python")
+ans = rag_chain.invoke("Who created python")
+print("")
+print(ans)
+print("")
