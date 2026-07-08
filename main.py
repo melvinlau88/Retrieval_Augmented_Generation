@@ -87,7 +87,6 @@ Question: {question}
 prompt = ChatPromptTemplate.from_template(answer_template)
 
 
-
 # Uses Langchain Expression Language for input, process and and output a question
 rag_chain = (
     {"context": retrieval_chain, 
@@ -99,8 +98,7 @@ rag_chain = (
     ) 
     
 
-
-ans = rag_chain.invoke("Who created python")
+ans = rag_chain.invoke({"question": "Who created python"})
 print("")
 print(ans)
 print("")
