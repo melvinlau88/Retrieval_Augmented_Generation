@@ -1,34 +1,42 @@
 r'''
 cd C:\Users\melvi\Downloads\VS_Code\Python\Retrieval_Augmented_Generation
 git add .
-git commit -m "Changed embedding method so I don't have to pay OpenAI"
+git commit -m "Placed back in a prompt removed by accident"
 git push
 '''
 
 from dotenv import load_dotenv
-load_dotenv()
-
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 import os
 os.environ['LANGCHAIN_TRACING_V2'] = 'true'
 os.environ['LANGCHAIN_ENDPOINT'] = 'https://api.smith.langchain.com'
 
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_community.vectorstores import Chroma
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.load import dumps, loads
+from operator import itemgetter
 
-
-# Extracs and joins page contents from each document in one string
 def format_docs(docs):
+    """Extracs and joins page contents from each document in one string"""
     return "\n\n".join(doc.page_content for doc in docs)
 
+
+def get_unique_union(documents: list[list]):
+    """Merge results from multiple queries into one deduplicated list of Documents.
+    Documents aren't hashable, so we serialize each to a JSON string to dedupe via
+    a set, then parse them back into Document objects."""
+    
+    flattened_docs = [dumps(doc) for sublist in documents for doc in sublist]
+    unique_docs = list(set(flattened_docs))
+    return [loads(doc) for doc in unique_docs]
+
 '''Load the Webpage'''
+load_dotenv()
 loader = WebBaseLoader("https://en.wikipedia.org/wiki/Python_(programming_language)")
 docs = loader.load()
 
@@ -50,7 +58,6 @@ retriever = vectorstore.as_retriever()
 
 '''Retreive and Generate'''
 
-
 # Create LLM with no creativity, only facts
 llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
@@ -59,26 +66,39 @@ different versions of the given user question to retrieve relevant documents fro
 database. By generating multiple perspectives on the user question, your goal is to help
 the user overcome some of the limitations of the distance-based similarity search. 
 Provide these alternative questions separated by newlines. Original question: {question}"""
-prompt = ChatPromptTemplate.from_template(template)
+prompt_generate = ChatPromptTemplate.from_template(template)
 
 generate_queries = (
-    prompt
+    prompt_generate
     | llm 
     | StrOutputParser() 
     | (lambda x: x.split("\n"))
 )
 
+retrieval_chain = generate_queries | retriever.map() | get_unique_union
+
+# A separate, proper answer-generating prompt — this was missing entirely
+answer_template = """Answer the following question based on this context:
+
+{context}
+
+Question: {question}
+"""
+prompt = ChatPromptTemplate.from_template(answer_template)
+
+
 
 # Uses Langchain Expression Language for input, process and and output a question
 rag_chain = (
-    {
-    "context": retriever | format_docs, 
-    "question": RunnablePassthrough()
+    {"context": retrieval_chain, 
+     "question": itemgetter("question")
     }
     | prompt
     | llm
     | StrOutputParser()
-)
+    ) 
+    
+
 
 ans = rag_chain.invoke("Who created python")
 print("")
