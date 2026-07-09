@@ -14,7 +14,10 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.load import dumps, loads
 from operator import itemgetter
 from typing import Literal
+from pydantic import BaseModel, Field
 
+# Basemodel acts a validation library, description and docstring used as specification
+# for for LLM 
 class RouteQuery(BaseModel):
     """Route a user query to the most relevant datasource."""
     datasource: Literal["python_docs", "js_docs", "golang_docs"] = Field(
@@ -22,11 +25,9 @@ class RouteQuery(BaseModel):
         description="Given a user question choose which datasource would be most relevant..."
     )
 
-
 def format_docs(docs):
     """Extracs and joins page contents from each document in one string"""
     return "\n\n".join(doc.page_content for doc in docs)
-
 
 def get_unique_union(documents: list[list]):
     """Merge results from multiple queries into one deduplicated list of Documents.
@@ -36,6 +37,15 @@ def get_unique_union(documents: list[list]):
     flattened_docs = [dumps(doc) for sublist in documents for doc in sublist]
     unique_docs = list(set(flattened_docs))
     return [loads(doc) for doc in unique_docs]
+
+def choose_route(result):
+    if "python_docs" in result.datasource.lower():
+        return "chain for python_docs"
+    elif "js_docs" in result.datasource.lower():
+        return "chain for js_docs"
+    else:
+        return "golang_docs"
+
 
 '''Load the Webpage'''
 load_dotenv()
@@ -62,6 +72,8 @@ retriever = vectorstore.as_retriever()
 
 # Create LLM with no creativity, only facts
 llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+
+structured_llm = llm.with_structured_output(RouteQuery)
 
 template = """You are an AI language model assistant. Your task is to generate five 
 different versions of the given user question to retrieve relevant documents from a vector 
