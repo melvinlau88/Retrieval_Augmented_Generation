@@ -1,10 +1,3 @@
-r'''
-cd C:\Users\melvi\Downloads\VS_Code\Python\Retrieval_Augmented_Generation
-git add .
-git commit -m "Placed back in a prompt removed by accident"
-git push
-'''
-
 from dotenv import load_dotenv
 
 import os
@@ -20,6 +13,15 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.load import dumps, loads
 from operator import itemgetter
+from typing import Literal
+
+class RouteQuery(BaseModel):
+    """Route a user query to the most relevant datasource."""
+    datasource: Literal["python_docs", "js_docs", "golang_docs"] = Field(
+        ...,
+        description="Given a user question choose which datasource would be most relevant..."
+    )
+
 
 def format_docs(docs):
     """Extracs and joins page contents from each document in one string"""
