@@ -48,6 +48,21 @@ def choose_route(result):
         return "chain for js_docs"
     else:
         return "golang_docs"
+    
+def prompt_router(input):
+    """Pick the prompt template's embedding  most similar to the question,
+    using cosine similarity"""
+    
+    query_embedding = embeddings.embed_query(input["query"])
+    similarity = cosine_similarity([query_embedding], prompt_embeddings)[0]
+    most_similar = prompt_templates[similarity.argmax()]
+
+    if most_similar == math_template:
+        print("Using MATH")
+    else:
+        print("Using PHYSCIS")
+
+    return PromptTemplate.from_template(most_similar)
 
 '''Load the Webpage'''
 load_dotenv()
@@ -128,6 +143,26 @@ rag_chain = (
     | StrOutputParser()
     ) 
     
+
+
+physics_template = """You are a very smart physics professor. \
+You are great at answering questions about physics in a concise and easy to understand manner. \
+When you don't know the answer to a question you admit that you don't know.
+
+Here is a question:
+{query}"""
+
+math_template = """You are a very good mathematician. You are great at answering math questions. \
+You are so good because you are able to break down hard problems into their component parts, \
+answer the component parts, and then put them together to answer the broader question.
+
+Here is a question:
+{query}"""
+
+prompt_templates = [physics_template, math_template]
+prompt_embeddings = embeddings.embed_documents(prompt_templates)
+
+
 
 ans = rag_chain.invoke({"question": "Who created python"})
 print("")
