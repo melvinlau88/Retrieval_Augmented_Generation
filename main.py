@@ -15,6 +15,7 @@ from langchain_core.load import dumps, loads
 from operator import itemgetter
 from typing import Literal
 from pydantic import BaseModel, Field
+from langchain_core.runnables import RunnableLambda
 
 # Basemodel acts a validation library, description and docstring used as specification
 # for for LLM 
@@ -46,7 +47,6 @@ def choose_route(result):
     else:
         return "golang_docs"
 
-
 '''Load the Webpage'''
 load_dotenv()
 loader = WebBaseLoader("https://en.wikipedia.org/wiki/Python_(programming_language)")
@@ -74,6 +74,21 @@ retriever = vectorstore.as_retriever()
 llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
 structured_llm = llm.with_structured_output(RouteQuery)
+
+
+system = """You are an expert at routing a user question to the appropriate data source.
+Based on the programming language the question is referring to, route it to the relevant data source."""
+
+# Uses LangChain prompt template to create prompt
+prompt = ChatPromptTemplate.from_messages([
+    ("system", system),
+    ("human", "{question}"),
+])
+
+router = prompt | structured_llm
+
+full_chain = router | RunnableLambda(choose_route)
+
 
 template = """You are an AI language model assistant. Your task is to generate five 
 different versions of the given user question to retrieve relevant documents from a vector 
