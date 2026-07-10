@@ -16,6 +16,8 @@ from operator import itemgetter
 from typing import Literal
 from pydantic import BaseModel, Field
 from langchain_core.runnables import RunnableLambda
+from langchain_community.utils.math import cosine_similarity
+from langchain_core.prompts import PromptTemplate
 
 # Basemodel acts a validation library, description and docstring used as specification
 # for for LLM 
