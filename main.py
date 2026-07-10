@@ -16,6 +16,9 @@ from operator import itemgetter
 from typing import Literal
 from pydantic import BaseModel, Field
 from langchain_core.runnables import RunnableLambda
+from langchain_community.utils.math import cosine_similarity
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 
 # Basemodel acts a validation library, description and docstring used as specification
 # for for LLM 
@@ -46,6 +49,21 @@ def choose_route(result):
         return "chain for js_docs"
     else:
         return "golang_docs"
+    
+def prompt_router(input):
+    """Pick the prompt template's embedding most similar to the question,
+    using cosine similarity"""
+
+    query_embedding = embeddings.embed_query(input["query"])
+    similarity = cosine_similarity([query_embedding], prompt_embeddings)[0]
+    most_similar = prompt_templates[similarity.argmax()]
+
+    if most_similar == python_syntax_template:
+        print("Using SYNTAX")
+    else:
+        print("Using HISTORY")
+
+    return PromptTemplate.from_template(most_similar)
 
 '''Load the Webpage'''
 load_dotenv()
@@ -126,6 +144,35 @@ rag_chain = (
     | StrOutputParser()
     ) 
     
+
+
+python_history_template = """You are a knowledgeable historian of programming languages. \
+You are great at explaining the origins, creators, design philosophy, and evolution of Python. \
+When you don't know the answer to a question you admit that you don't know.
+
+Here is a question:
+{query}"""
+
+python_syntax_template = """You are an expert Python programmer and teacher. \
+You are great at explaining Python syntax, code examples, and how to write working code. \
+You are so good because you break down concepts into simple, correct code snippets.
+
+Here is a question:
+{query}"""
+
+prompt_templates = [python_history_template, python_syntax_template]
+prompt_embeddings = embeddings.embed_documents(prompt_templates)
+
+
+
+routing_chain = (
+    {"query": RunnablePassthrough()}
+    | RunnableLambda(prompt_router)
+    | llm                          
+    | StrOutputParser()
+)
+
+
 
 ans = rag_chain.invoke({"question": "Who created python"})
 print("")
