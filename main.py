@@ -20,11 +20,39 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 import requests
 from langchain_core.documents import Document
+import datetime
+from typing import Optional
 
 # Basemodel acts a validation library, description and docstring used as specification
 # for for LLM 
 class RouteQuery(BaseModel):
     datasource: Literal["python_docs", "js_docs", "golang_docs"] = Field(...)
+
+# Form for query to fill
+class MovieSearch(BaseModel):
+    """Search over a database of movies."""
+
+    content_search: str = Field(
+        ...,
+        description="Similarity search query applied to movie overviews/descriptions.",
+    )
+    min_rating: Optional[float] = Field(
+        None,
+        description="Minimum rating filter, inclusive. Only use if explicitly specified.",
+    )
+    max_rating: Optional[float] = Field(
+        None,
+        description="Maximum rating filter, exclusive. Only use if explicitly specified.",
+    )
+    earliest_release_date: Optional[datetime.date] = Field(
+        None,
+        description="Earliest release date filter, inclusive. Only use if explicitly specified.",
+    )
+    latest_release_date: Optional[datetime.date] = Field(
+        None,
+        description="Latest release date filter, exclusive. Only use if explicitly specified.",
+    )
+
 
 def format_docs(docs):
     """Extracs and joins page contents from each document in one string"""
