@@ -19,15 +19,13 @@ from langchain_core.runnables import RunnableLambda
 from langchain_community.utils.math import cosine_similarity
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+import requests
+from langchain_core.documents import Document
 
 # Basemodel acts a validation library, description and docstring used as specification
 # for for LLM 
 class RouteQuery(BaseModel):
-    """Route a user query to the most relevant datasource."""
-    datasource: Literal["python_docs", "js_docs", "golang_docs"] = Field(
-        ...,
-        description="Given a user question choose which datasource would be most relevant..."
-    )
+    datasource: Literal["python_docs", "js_docs", "golang_docs"] = Field(...)
 
 def format_docs(docs):
     """Extracs and joins page contents from each document in one string"""
@@ -53,22 +51,43 @@ def choose_route(result):
 def prompt_router(input):
     """Pick the prompt template's embedding most similar to the question,
     using cosine similarity"""
-
     query_embedding = embeddings.embed_query(input["query"])
     similarity = cosine_similarity([query_embedding], prompt_embeddings)[0]
     most_similar = prompt_templates[similarity.argmax()]
 
-    if most_similar == python_syntax_template:
-        print("Using SYNTAX")
+    if most_similar == movie_recommendation_template:
+        print("Using RECOMMENDATION")
     else:
-        print("Using HISTORY")
+        print("Using FACTS")
 
     return PromptTemplate.from_template(most_similar)
 
-'''Load the Webpage'''
+
 load_dotenv()
-loader = WebBaseLoader("https://en.wikipedia.org/wiki/Python_(programming_language)")
-docs = loader.load()
+tmdb_key = os.getenv("TMDB_API_KEY")
+
+movies = []
+for page in range(1, 11):   
+    response = requests.get(
+        "https://api.themoviedb.org/3/movie/popular",
+        params={"api_key": tmdb_key, "language": "en-US", "page": page}
+    )
+    response.raise_for_status()
+    movies.extend(response.json()["results"])
+
+docs = []
+for movie in movies:
+    doc = Document(
+        page_content=f"{movie['title']}: {movie['overview']}",
+        metadata={
+            "title": movie["title"],
+            "release_date": movie.get("release_date", ""),
+            "rating": movie.get("vote_average", 0),
+            "genre_ids": movie.get("genre_ids", []),
+        },
+    )
+    docs.append(doc)
+
 
 '''Split the Text'''
 # Break text into chunks of 1,000 characters, but allow adjacent chunks to share 200 characters of overlap so context isn't lost."
@@ -145,24 +164,22 @@ rag_chain = (
     ) 
     
 
-
-python_history_template = """You are a knowledgeable historian of programming languages. \
-You are great at explaining the origins, creators, design philosophy, and evolution of Python. \
+movie_facts_template = """You are a knowledgeable film database expert. \
+You are great at answering factual questions about plot, cast, release dates, and ratings. \
 When you don't know the answer to a question you admit that you don't know.
 
 Here is a question:
 {query}"""
 
-python_syntax_template = """You are an expert Python programmer and teacher. \
-You are great at explaining Python syntax, code examples, and how to write working code. \
-You are so good because you break down concepts into simple, correct code snippets.
+movie_recommendation_template = """You are an enthusiastic film critic and recommender. \
+You are great at suggesting movies based on mood, genre, and similarity to other films. \
+You explain your reasoning for each recommendation.
 
 Here is a question:
 {query}"""
 
-prompt_templates = [python_history_template, python_syntax_template]
+prompt_templates = [movie_facts_template, movie_recommendation_template]
 prompt_embeddings = embeddings.embed_documents(prompt_templates)
-
 
 
 routing_chain = (
@@ -174,7 +191,7 @@ routing_chain = (
 
 
 
-ans = rag_chain.invoke({"question": "Who created python"})
+ans = rag_chain.invoke({"question": "What are some popular action movies right now?"})
 print("")
 print(ans)
 print("")
