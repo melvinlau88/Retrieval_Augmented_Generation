@@ -137,11 +137,14 @@ for page in range(1, 11):
 
 docs = []
 for movie in movies:
+    raw_date = movie.get("release_date", "")
+    date_int = int(raw_date.replace("-", "")) if raw_date else 0   # e.g. "2015-03-12" -> 20150312
+
     doc = Document(
         page_content=f"{movie['title']}: {movie['overview']}",
         metadata={
             "title": movie["title"],
-            "release_date": movie.get("release_date", ""),
+            "release_date": date_int,          # ← now an int
             "rating": movie.get("vote_average", 0),
             "genre_ids": ",".join(str(i) for i in movie.get("genre_ids", [])),
         },
@@ -265,9 +268,6 @@ query_prompt = ChatPromptTemplate.from_messages([
 query_structured_llm = llm.with_structured_output(MovieSearch)
 query_analyzer = query_prompt | query_structured_llm
 
-
-search_result = query_analyzer.invoke({"question": "highly rated action movies from the 2010s"})
-filtered_docs = retrieve_with_filters(search_result)
 
 ans = rag_chain.invoke({"question": "What are some popular action movies right now?"})
 print("")
