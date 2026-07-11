@@ -53,6 +53,11 @@ class MovieSearch(BaseModel):
         description="Latest release date filter, exclusive. Only use if explicitly specified.",
     )
 
+    def print_items(self) -> None:
+        for field in type(self).model_fields: 
+            value = getattr(self, field)
+            if value is not None:
+                print(f"{field}: {value}")
 
 def format_docs(docs):
     """Extracs and joins page contents from each document in one string"""
@@ -89,6 +94,27 @@ def prompt_router(input):
 
     return PromptTemplate.from_template(most_similar)
 
+def retrieve_with_filters(search: MovieSearch):
+    """Convert a MovieSearch object into a Chroma filter and run a filtered similarity search."""
+    conditions = []
+
+    if search.min_rating is not None:
+        conditions.append({"rating": {"$gte": search.min_rating}})
+    if search.max_rating is not None:
+        conditions.append({"rating": {"$lte": search.max_rating}})
+    if search.earliest_release_date is not None:
+        conditions.append({"release_date": {"$gte": str(search.earliest_release_date)}})
+    if search.latest_release_date is not None:
+        conditions.append({"release_date": {"$lte": str(search.latest_release_date)}})
+
+    if len(conditions) == 0:
+        filter = None
+    elif len(conditions) == 1:
+        filter = conditions[0]
+    else:
+        filter = {"$and": conditions}
+
+    return vectorstore.similarity_search(search.content_search, k=5, filter=filter)
 
 load_dotenv()
 tmdb_token = os.getenv("TMDB_API_TOKEN")
@@ -223,7 +249,25 @@ routing_chain = (
     | StrOutputParser()
 )
 
+# Template for the Query Analyser
 
+query_system = """You are an expert at converting user questions into database queries.
+You have access to a database of movies. Given a question, return a database query
+optimized to retrieve the most relevant results.
+
+If there are acronyms or words you are not familiar with, do not try to rephrase them."""
+
+query_prompt = ChatPromptTemplate.from_messages([
+    ("system", query_system),
+    ("human", "{question}"),
+])
+
+query_structured_llm = llm.with_structured_output(MovieSearch)
+query_analyzer = query_prompt | query_structured_llm
+
+
+search_result = query_analyzer.invoke({"question": "highly rated action movies from the 2010s"})
+filtered_docs = retrieve_with_filters(search_result)
 
 ans = rag_chain.invoke({"question": "What are some popular action movies right now?"})
 print("")
