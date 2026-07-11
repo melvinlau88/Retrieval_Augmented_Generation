@@ -64,13 +64,20 @@ def prompt_router(input):
 
 
 load_dotenv()
-tmdb_key = os.getenv("TMDB_API_KEY")
+tmdb_token = os.getenv("TMDB_API_TOKEN")
+print("Key loaded:", tmdb_token is not None, "| length:", len(tmdb_token) if tmdb_token else 0)
+
+headers = {
+    "Authorization": f"Bearer {tmdb_token}",
+    "accept": "application/json"
+}
 
 movies = []
 for page in range(1, 11):   
     response = requests.get(
         "https://api.themoviedb.org/3/movie/popular",
-        params={"api_key": tmdb_key, "language": "en-US", "page": page}
+        headers=headers,                             
+        params={"language": "en-US", "page": page}   
     )
     response.raise_for_status()
     movies.extend(response.json()["results"])
@@ -83,7 +90,7 @@ for movie in movies:
             "title": movie["title"],
             "release_date": movie.get("release_date", ""),
             "rating": movie.get("vote_average", 0),
-            "genre_ids": movie.get("genre_ids", []),
+            "genre_ids": ",".join(str(i) for i in movie.get("genre_ids", [])),
         },
     )
     docs.append(doc)
