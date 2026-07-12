@@ -103,9 +103,11 @@ def retrieve_with_filters(search: MovieSearch):
     if search.max_rating is not None:
         conditions.append({"rating": {"$lte": search.max_rating}})
     if search.earliest_release_date is not None:
-        conditions.append({"release_date": {"$gte": str(search.earliest_release_date)}})
+        date_int = int(search.earliest_release_date.strftime("%Y%m%d"))
+        conditions.append({"release_date": {"$gte": date_int}})
     if search.latest_release_date is not None:
-        conditions.append({"release_date": {"$lte": str(search.latest_release_date)}})
+        date_int = int(search.latest_release_date.strftime("%Y%m%d"))
+        conditions.append({"release_date": {"$lte": date_int}})
 
     if len(conditions) == 0:
         filter = None
@@ -138,13 +140,13 @@ for page in range(1, 11):
 docs = []
 for movie in movies:
     raw_date = movie.get("release_date", "")
-    date_int = int(raw_date.replace("-", "")) if raw_date else 0   # e.g. "2015-03-12" -> 20150312
+    date_int = int(raw_date.replace("-", "")) if raw_date else 0
 
     doc = Document(
         page_content=f"{movie['title']}: {movie['overview']}",
         metadata={
             "title": movie["title"],
-            "release_date": date_int,          # ← now an int
+            "release_date": date_int,          
             "rating": movie.get("vote_average", 0),
             "genre_ids": ",".join(str(i) for i in movie.get("genre_ids", [])),
         },
